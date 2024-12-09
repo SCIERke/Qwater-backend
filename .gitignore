@@ -1,0 +1,67 @@
+# Python environment
+.env
+.venv/
+env/
+virtualenv/
+
+# Dependency cache
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Database
+*.sqlite3
+db.sqlite3
+
+# Static cache / temporary files
+*.log
+*.tmp
+.cache/
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+.eggs/
+
+# Test cache
+.pytest_cache/
+
+# Pytest cache directories
+.pytest_cache/
+
+# Environment variable example
+.env
+
+# Coverage directory
+htmlcov/
+.coverage
+.coverage.*
+.cache/
+
+# VSCode
+.vscode/
+
+# Secrets
+secrets.json
+config.json
+
+# Optional directories for FastAPI app deployments
+uploads/
+
+# Docker
+docker-compose.yml
+Dockerfile
