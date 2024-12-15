@@ -14,10 +14,10 @@ from firebase_admin import credentials, firestore, storage
 from uuid import uuid4
 import io
 import base64
-
+import dotenv
 
 #Firebase implement
-cred = credentials.Certificate("config.json")
+cred = credentials.Certificate(FIREBASE_ADMIN_SDK)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 image_collection = db.collection("images")
