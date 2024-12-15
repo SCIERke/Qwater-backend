@@ -21,9 +21,19 @@ load_dotenv()
 
 FIREBASE_ADMIN_SDK = os.environ.get('FIREBASE_ADMIN_SDK')
 
-#Firebase implement
-cred = credentials.Certificate(FIREBASE_ADMIN_SDK)
-firebase_admin.initialize_app(cred)
+if FIREBASE_ADMIN_SDK:
+    try:
+        firebase_credentials = json.loads(FIREBASE_ADMIN_SDK)
+
+        cred = credentials.Certificate(firebase_credentials)
+        firebase_admin.initialize_app(cred)
+        print("Firebase initialized successfully!")
+    except Exception as e:
+        raise ValueError(f"Failed to load Firebase credentials: {e}")
+else:
+    raise ValueError("FIREBASE_ADMIN_SDK environment variable is not set.")
+
+
 db = firestore.client()
 image_collection = db.collection("images")
 
