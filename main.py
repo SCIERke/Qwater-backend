@@ -9,7 +9,19 @@ from mimetypes import guess_type
 from PIL import Image
 import xgboost as xgb
 from pydantic import BaseModel
-4
+import firebase_admin
+from firebase_admin import credentials, firestore, storage
+from uuid import uuid4
+import io
+import base64
+
+
+#Firebase implement
+cred = credentials.Certificate("config.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+image_collection = db.collection("images")
+
 class ItemBase(BaseModel) :
     ph: float
     Hardness: float
@@ -23,7 +35,7 @@ class ItemBase(BaseModel) :
 
 class ItemCreated(ItemBase):
     pass
-    
+
 class ItemResponse(ItemBase):
     id: int
     class Config:
@@ -33,7 +45,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], 
+allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,35 +67,74 @@ def upload_data(item : ItemCreated ):
     for field, value in item.dict().items():
         if value is None or (isinstance(value, float) and np.isnan(value)):
             raise HTTPException(status_code=400, detail=f"Invalid value for {field}")
-    
+
     input_data = pd.DataFrame([item.dict()])
     dmatrix = xgb.DMatrix(input_data)
 
     prediction = loaded_model.predict(dmatrix)
 
-    return {"input": item.dict(), "prediction": prediction.tolist()} 
+    return {"input": item.dict(), "prediction": prediction.tolist()}
 
-
-@app.post("/upload-picture")
+@app.post("/upload-picture-tofirestore")
 async def upload_file(file: UploadFile = File(...)):
-    temp_file_path = os.path.join(SAVE_DIR, file.filename)
-    
-    with open(temp_file_path, "wb") as f:
-        f.write(await file.read())
+    if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+        raise HTTPException(status_code=400, detail="File must be an image (jpeg/png/jpg)")
 
-    results = picture_model.predict(source=temp_file_path, conf=0.5, save=True, save_dir=SAVE_DIR)
+    file_bytes = await file.read()
+    image = Image.open(io.BytesIO(file_bytes))
+    image = image.convert("RGB")
 
-    processed_image_path = None
-    for result in results:
-        annotated_image = result.plot()
-        processed_image_path = os.path.join(SAVE_DIR, "processed_" + file.filename)
-        
-        annotated_image = Image.fromarray(annotated_image)
-        annotated_image.save(processed_image_path)
-        break
+    results = picture_model.predict(source=image, conf=0.5)
 
-    if processed_image_path and os.path.exists(processed_image_path):
-        return FileResponse(processed_image_path, media_type="image/png")
+    if results:
+        annotated_image = results[0].plot()
+
+        annotated_image_pil = Image.fromarray(annotated_image)
+
+        processed_image_blob = io.BytesIO()
+        if file.content_type == "image/png":
+            annotated_image_pil.save(processed_image_blob, format="PNG")
+        elif file.content_type in ["image/jpeg", "image/jpg"]:
+            annotated_image_pil.save(processed_image_blob, format="JPEG")
+
+        processed_image_blob.seek(0)
+
+        processed_image_base64 = base64.b64encode(processed_image_blob.read()).decode('utf-8')
+
+        metadata = {
+            "original_filename": file.filename,
+            "processed_image_base64": processed_image_base64,
+            "content_type": file.content_type,
+        }
+
+        try:
+            doc_ref = image_collection.add(metadata)
+            if isinstance(doc_ref, tuple):
+                doc_id = doc_ref[0]
+            else:
+                doc_id = doc_ref.id
+
+            return {"message": "Image processed and saved successfully", "file_id": doc_id}
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error saving to Firestore: {str(e)}")
     else:
-        return {"error": "Processed image not found. Check the model or output directory."}
-    
+        raise HTTPException(status_code=500, detail="Image processing failed.")
+
+@app.get("/get-image-data/{file_name}")
+async def get_image_data(file_name: str):
+    try:
+        image_collection = db.collection('images')
+
+        query = image_collection.where('original_filename', '==', file_name)
+        results = query.stream()
+
+        images = [doc.to_dict() for doc in results]
+
+        if not images:
+            raise HTTPException(status_code=404, detail="No image found with the given filename")
+
+        return {"images": images}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading from Firestore: {str(e)}")
