@@ -15,9 +15,14 @@ from uuid import uuid4
 import io
 import base64
 import dotenv
+import json
+
+FIREBASE_CREDENTIALS = os.getenv("FIREBASE_ADMIN_SDK")
+if not FIREBASE_CREDENTIALS:
+    raise ValueError("FIREBASE_ADMIN_SDK environment variable is missing")
 
 #Firebase implement
-cred = credentials.Certificate(FIREBASE_ADMIN_SDK)
+cred = credentials.Certificate(json.loads(FIREBASE_CREDENTIALS))
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 image_collection = db.collection("images")
