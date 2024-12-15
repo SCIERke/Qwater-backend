@@ -14,8 +14,10 @@ from firebase_admin import credentials, firestore, storage
 from uuid import uuid4
 import io
 import base64
-import dotenv
+from dotenv import load_dotenv
 import json
+
+load_dotenv()
 
 FIREBASE_ADMIN_SDK = os.environ.get('FIREBASE_ADMIN_SDK')
 
